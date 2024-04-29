@@ -119,6 +119,48 @@ create table if not exists Collection(
 
 insert into Collection(collection_name) values ('Jazz Fusion Masterpieces'), ('Ethno Beats: Global Rhythms'), ('Punk Unplugged: Acoustic Anthems'), ('Timeless Tracks: Jazz, World, and Punk');
 
+--INSERT INTO Collection(collection_name, collection_id)
+--SELECT 
+--    'Jazz Fusion Masterpieces', collection_id 
+--FROM 
+--    collection_trak 
+--WHERE 
+--    trak_id IN (1, 2, 5)
+--UNION ALL
+--SELECT 
+--    'Ethno Beats: Global Rhythms', collection_id 
+--FROM 
+--    collection_trak 
+--WHERE 
+--    trak_id = 3
+--UNION ALL
+--SELECT 
+--    'Punk Unplugged: Acoustic Anthems', collection_id 
+--FROM 
+--    collection_trak 
+--WHERE 
+--    trak_id IN (4, 6)
+--UNION ALL
+--SELECT 
+--   'Timeless Tracks: Jazz, World, and Punk', collection_id 
+--FROM 
+--    collection_trak 
+--WHERE 
+--    trak_id IN (7, 8, 9);
+
+
+--INSERT INTO Collection(collection_name, collection_id) VALUES
+--('Jazz Fusion Masterpieces', (SELECT collection_id FROM collection_trak WHERE trak_id = 1)),
+--('Jazz Fusion Masterpieces', (SELECT collection_id FROM collection_trak where trak_id = 2)), 
+--('Ethno Beats: Global Rhythms', (SELECT collection_id FROM collection_trak where trak_id = 3)), 
+--('Punk Unplugged: Acoustic Anthems', (SELECT collection_id FROM collection_trak where trak_id = 4)), 
+--('Jazz Fusion Masterpieces', (SELECT collection_id FROM collection_trak where trak_id = 5)), 
+--('Punk Unplugged: Acoustic Anthems', (SELECT collection_id FROM collection_trak where trak_id = 6)), 
+--('Timeless Tracks: Jazz, World, and Punk', (SELECT collection_id FROM collection_trak where trak_id = 7)), 
+--('Timeless Tracks: Jazz, World, and Punk', (SELECT collection_id FROM collection_trak where trak_id = 8)), 
+--('Timeless Tracks: Jazz, World, and Punk', (SELECT collection_id FROM collection_trak where trak_id = 9));
+
+
 create table if not exists Collection_trak(
 	collection_id integer references Collection(collection_id),
 	trak_id INTEGER references Trak(trak_id)
@@ -172,57 +214,123 @@ WHERE collection_name = 'Punk Unplugged: Acoustic Anthems';
 UPDATE Collection
 SET collection_release_date = '2017-12-30' 
 WHERE collection_name = 'Timeless Tracks: Jazz, World, and Punk';
+
+
    
    
+-- тут использовать max
 --1
+SELECT trak_name, track_duration 
+FROM Trak 
+WHERE track_duration = (SELECT MAX(track_duration) FROM Trak)
+--2
 SELECT trak_name, track_duration FROM Trak 
 ORDER BY track_duration DESC, trak_name 
 LIMIT 1;
---2
-SELECT trak_name, track_duration 
-FROM Trak 
-WHERE track_duration = (SELECT MAX(track_duration) FROM Trak);
 --3
 SELECT trak_name, track_duration FROM Trak 
 where track_duration >= '00:03:30';
 --4
 SELECT collection_name, collection_release_date FROM Collection
 where collection_release_date between '2018-01-01'::date AND '2020-12-31'::date;
---5
+--5 
 SELECT singers_name FROM Executor
 WHERE singers_name NOT LIKE '% %';
---6
+--5
 SELECT trak_name FROM Trak
 WHERE trak_name like '%My%';
 
---7
+--6
 SELECT genre_name, COUNT(singer_id)
 FROM Genre
 LEFT JOIN Singers_genres ON Genre.genre_id = Singers_genres.genre_id
 GROUP BY Genre.genre_name;
 
---8
+
+--SELECT COUNT(*)
+--FROM Trak
+--FULL JOIN Album_artist ON Trak.album_id = Album_artist.album_id 
+--FULL JOIN Music_album ON Album_artist.album_id = Music_album.album_id
+--WHERE EXTRACT(year FROM Music_album.name_album::DATE) BETWEEN EXTRACT(year FROM TO_DATE('2019-01-01', 'YYYY-MM-DD')) AND EXTRACT(year FROM TO_DATE('2020-12-31', 'YYYY-MM-DD'));
+--7
 select count(*) from Trak
 FULL join Album_artist on Trak.album_id = Album_artist.album_id 
 FULL join Collection  on Album_artist.album_id = Collection.collection_id 
 WHERE extract(year from Collection.collection_release_date) BETWEEN EXTRACT(year FROM TO_DATE('2019-01-01', 'YYYY-MM-DD')) AND EXTRACT(year FROM TO_DATE('2020-12-31', 'YYYY-MM-DD'));
---9
+
+--8 неверное объеденение
+--select count(*) from Trak
+--FULL join Album_artist on Trak.album_id = Album_artist.album_id 
+--FULL join music_album  on Album_artist.album_id = music_album.album_id  
+--WHERE extract(year from music_album.name_album) BETWEEN EXTRACT(year FROM TO_DATE('2019-01-01', 'YYYY-MM-DD')) AND EXTRACT(year FROM TO_DATE('2020-12-31', 'YYYY-MM-DD'));
+
+
+--8 поправка 
 select AVG(track_duration) from trak
-left join music_album on trak.trak_id = music_album.album_id;
---10
-select singers_name from executor 
-left join Album_artist on executor.singer_id = Album_artist.album_id 
-left join Collection  on Album_artist.album_id = Collection.collection_id 
-WHERE collection_release_date IS NULL OR EXTRACT(YEAR FROM collection_release_date) != 2020;
+left join music_album on trak.album_id = music_album.album_id;
+
+
+
+--кто выпустил хоть что-то, 
+--кроме того, что выпустил в 2020”, 
+--а не на вопрос: “кто не выпустил альбомы в 2020 году”
+--Чтобы решить поставленную задачу 
+--нужно сначала найти тех исполнителей, 
+--кто выпустил альбом в 2020 (вложенным запросом), 
+--а потом их исключить из общего списка исполнителей
+--10 некоректное объеденение 
+
+
+select singers_name
+from executor
+where singers_name not in
+	(select singers_name
+	from executor
+	left join Album_artist on executor.singer_id = Album_artist.album_id 
+	left join Collection  on Album_artist.album_id = Collection.collection_id 
+	WHERE collection_release_date IS NULL 
+		OR EXTRACT(YEAR FROM collection_release_date) = 2020
+);
+
+
+--select singers_name from executor 
+--left join Album_artist on executor.singer_id = Album_artist.album_id 
+--left join Collection  on Album_artist.album_id = Collection.collection_id 
+--WHERE collection_release_date IS NULL OR EXTRACT(YEAR FROM collection_release_date) = 2020;
 --where collection_release_date is null or collection_release_date != 2020;
 
---11
-select collection_name from collection 
-left join executor on executor.singer_id = collection.collection_id 
-where singers_name like 'Chick Corea';
+--10
+--select collection_name from collection 
+--left join executor on executor.singer_id = collection.collection_id 
+--where singers_name like 'Chick Corea';
 
 
 
+select c.collection_name
+from collection c
+full join collection_trak ct on c.collection_id = ct.trak_id 
+full join trak t on ct.trak_id  = t.trak_id 
+full join album_artist aa  on t.trak_id = aa.album_id 
+full join music_album ma on aa.album_id = ma.singers_id
+full join executor e on ma.singers_id = e.singer_id
+where e.singers_name like 'Weather Report';
+
+
+
+--select e.singer_id, ma.name_album, aa.album_id, t.trak_id,
+--c.collection_id, col.collection_name from collection
+--join music_album ma on e.singer_id = ma.album_id 
+--join album_artist aa on t.trak_id = aa.album_id 
+--left join executor e on e.singer_id = album_artist.album_id 
+--left join executor e on e.singer_id = album_artist.album_id 
+
+
+--12
+SELECT singers_name 
+FROM Executor 
+LEFT JOIN Album_artist ON Executor.singer_id = Album_artist.album_id 
+LEFT JOIN Collection ON Album_artist.album_id = Collection.collection_id 
+WHERE collection_release_date IS NULL OR EXTRACT(YEAR FROM collection_release_date) != 2020;
 
 
 --SELECT COUNT(DISTINCT artist_id) FROM Artists
